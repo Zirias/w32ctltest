@@ -13,6 +13,7 @@ static HWND textBox;
 
 static NONCLIENTMETRICSW ncm;
 static HFONT messageFont;
+static TEXTMETRICW messageFontMetrics;
 static int buttonWidth;
 static int buttonHeight;
 static int textBoxWidth;
@@ -38,29 +39,31 @@ static int enableVisualStyles(void)
     if (cch >= sizeof(dir) / sizeof(*dir)) { return 0; }
     dir[cch] = L'\0';
     ActivateActCtx(CreateActCtxW(&actCtx), &ulpActivationCookie);
-    INITCOMMONCONTROLSEX icx;
-    icx.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icx.dwICC = ICC_WIN95_CLASSES;
-    InitCommonControlsEx(&icx);
     return (int) ulpActivationCookie;
 }
 
 static void init(void)
 {
+    INITCOMMONCONTROLSEX icx;
+    icx.dwSize = sizeof(INITCOMMONCONTROLSEX);
+    icx.dwICC = ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&icx);
     ncm.cbSize = sizeof(ncm);
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-    messageFont = CreateFontIndirectW(&ncm.lfMessageFont);
+    //messageFont = CreateFontIndirectW(&ncm.lfStatusFont);
+    messageFont = GetStockObject(DEFAULT_GUI_FONT);
     HDC dc = GetDC(0);
     SelectObject(dc, (HGDIOBJ) messageFont);
+    GetTextMetricsW(dc, &messageFontMetrics);
     SIZE sampleSize;
     GetTextExtentExPointW(dc,
             L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
             52, 0, 0, 0, &sampleSize);
     ReleaseDC(0, dc);
     buttonWidth = MulDiv(sampleSize.cx, 50, 4 * 52);
-    buttonHeight = MulDiv(sampleSize.cy, 14, 8);
+    buttonHeight = MulDiv(messageFontMetrics.tmHeight, 14, 8);
     textBoxWidth = 100;
-    textBoxHeight = MulDiv(sampleSize.cy, 14, 8);
+    textBoxHeight = MulDiv(messageFontMetrics.tmHeight, 14, 8);
     instance = GetModuleHandleW(0);
 }
 
