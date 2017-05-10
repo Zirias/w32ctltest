@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 
 #include <windows.h>
@@ -42,6 +43,50 @@ static int enableVisualStyles(void)
     return (int) ulpActivationCookie;
 }
 
+static LRESULT CALLBACK textBoxProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
+{
+    WNDPROC defaultProc = (WNDPROC)GetPropW(w, L"defaultProc");
+    RECT *fullClientRect;
+
+    switch (msg)
+    {
+    case WM_ERASEBKGND:
+        fullClientRect = (RECT *)GetPropW(w, L"fullClientRect");
+        if (!fullClientRect) break;
+        WNDCLASSEXW wc;
+        wc.cbSize = sizeof(wc);
+        GetClassInfoExW(0, L"Edit", &wc);
+        HDC dc = GetDC(w);
+        FillRect(dc, fullClientRect, wc.hbrBackground);
+        ReleaseDC(w, dc);
+        return 1;
+
+    case WM_NCCALCSIZE:
+        if (!wp) break;
+        LRESULT result = CallWindowProc(defaultProc, w, msg, wp, lp);
+        NCCALCSIZE_PARAMS *p = (NCCALCSIZE_PARAMS *)lp;
+        int height = p->rgrc[0].bottom - p->rgrc[0].top;
+        if (height > messageFontMetrics.tmHeight)
+        {
+            fullClientRect = (RECT *)GetPropW(w, L"fullClientRect");
+            if (!fullClientRect)
+            {
+                fullClientRect = malloc(sizeof(RECT));
+                SetPropW(w, L"fullClientRect", (HANDLE)fullClientRect);
+            }
+            memcpy(fullClientRect, &(p->rgrc[0]), sizeof(RECT));
+            MapWindowPoints(GetParent(w), w, fullClientRect, 2);
+            int offset = (height - messageFontMetrics.tmHeight) / 2;
+            p->rgrc[0].top += offset;
+            fullClientRect->top -= offset;
+            fullClientRect->bottom -= offset;
+        }
+        return result;
+    }
+
+    CallWindowProc(defaultProc, w, msg, wp, lp);
+}
+
 static void init(void)
 {
     INITCOMMONCONTROLSEX icx;
@@ -50,8 +95,8 @@ static void init(void)
     InitCommonControlsEx(&icx);
     ncm.cbSize = sizeof(ncm);
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-    //messageFont = CreateFontIndirectW(&ncm.lfStatusFont);
-    messageFont = GetStockObject(DEFAULT_GUI_FONT);
+    messageFont = CreateFontIndirectW(&ncm.lfStatusFont);
+    //messageFont = GetStockObject(DEFAULT_GUI_FONT);
     HDC dc = GetDC(0);
     SelectObject(dc, (HGDIOBJ) messageFont);
     GetTextMetricsW(dc, &messageFontMetrics);
@@ -82,6 +127,11 @@ static LRESULT CALLBACK wproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
                 WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
                 6 + buttonWidth, 2, textBoxWidth, textBoxHeight,
                 w, 0, instance, 0);
+        SetPropW(textBox, L"defaultProc",
+                (HANDLE)SetWindowLongPtr(textBox, GWLP_WNDPROC,
+                    (LONG_PTR)textBoxProc));
+        SetWindowPos(textBox, 0, 0, 0, 0, 0,
+                SWP_NOOWNERZORDER|SWP_NOSIZE|SWP_NOMOVE|SWP_FRAMECHANGED);
         SendMessageW(textBox, WM_SETFONT, (WPARAM)messageFont, 0);
 
         break;
