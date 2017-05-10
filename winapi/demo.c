@@ -70,28 +70,31 @@ static LRESULT CALLBACK wproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
     {
     case WM_CREATE:
         button = CreateWindowExW(0, L"Button", L"test",
-                WS_CHILD|WS_VISIBLE|SS_CENTER,
+                WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
                 2, 2, buttonWidth, buttonHeight,
                 w, (HMENU)CID_button, instance, 0);
+        SendMessageW(button, WM_SETFONT, (WPARAM)messageFont, 0);
 
         textBox = CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", L"",
                 WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
                 6 + buttonWidth, 2, textBoxWidth, textBoxHeight,
                 w, 0, instance, 0);
-	break;
+        SendMessageW(textBox, WM_SETFONT, (WPARAM)messageFont, 0);
+
+        break;
 
     case WM_DESTROY:
-	PostQuitMessage(0);
-	break;
+        PostQuitMessage(0);
+        break;
 
     case WM_COMMAND:
-	switch (LOWORD(wp))
-	{
-	case CID_button:
-	    DestroyWindow(w);
-	    break;
-	}
-	break;
+        switch (LOWORD(wp))
+        {
+        case CID_button:
+            DestroyWindow(w);
+            break;
+        }
+        break;
 
     }
 
