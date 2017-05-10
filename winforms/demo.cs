@@ -11,7 +11,7 @@ namespace W32CtlTest
 
         public Demo() : base()
         {
-            Text = "W32CtlTest Windows.Forms";
+            Text = "winforms";
             panel = new FlowLayoutPanel();
 
             button = new Button();
@@ -32,7 +32,7 @@ namespace W32CtlTest
         {
             get
             {
-                return new Size(480,180);
+                return new Size(240,100);
             }
         }
 
