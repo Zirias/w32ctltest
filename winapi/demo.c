@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -46,7 +45,7 @@ static int enableVisualStyles(void)
 
 static LRESULT CALLBACK textBoxProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
 {
-    WNDPROC defaultProc = (WNDPROC)GetPropW(w, L"defaultProc");
+    WNDPROC defaultProc = (WNDPROC)(UINT_PTR)GetPropW(w, L"defaultProc");
     RECT *fullClientRect;
 
     switch (msg)
@@ -54,8 +53,6 @@ static LRESULT CALLBACK textBoxProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
     case WM_ERASEBKGND:
         fullClientRect = (RECT *)GetPropW(w, L"fullClientRect");
         if (!fullClientRect) break;
-        puts("custom erase background");
-        fflush(stdout);
         WNDCLASSEXW wc;
         wc.cbSize = sizeof(wc);
         GetClassInfoExW(0, L"Edit", &wc);
@@ -74,8 +71,6 @@ static LRESULT CALLBACK textBoxProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
             fullClientRect = (RECT *)GetPropW(w, L"fullClientRect");
             if (!fullClientRect)
             {
-                puts("creating full client rect");
-                fflush(stdout);
                 fullClientRect = malloc(sizeof(RECT));
                 SetPropW(w, L"fullClientRect", (HANDLE)fullClientRect);
             }
@@ -86,20 +81,11 @@ static LRESULT CALLBACK textBoxProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
             p->rgrc[0].bottom -= offset;
             fullClientRect->top -= offset;
             fullClientRect->bottom -= offset;
-            printf("full client rect: {%d,%d,%d,%d}\n"
-                    "adjusted client screen rect: {%d,%d,%d,%d}\n",
-                    fullClientRect->left, fullClientRect->top,
-                    fullClientRect->right, fullClientRect->bottom,
-                    p->rgrc[0].left, p->rgrc[0].top,
-                    p->rgrc[0].right, p->rgrc[0].bottom);
-            fflush(stdout);
         }
-        printf("WM_NCCALCSIZE result: 0x%08x\n", result);
-        fflush(stdout);
         return result;
     }
 
-    CallWindowProc(defaultProc, w, msg, wp, lp);
+    return CallWindowProc(defaultProc, w, msg, wp, lp);
 }
 
 static void init(void)

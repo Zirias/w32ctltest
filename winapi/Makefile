@@ -1,5 +1,11 @@
 CC:=gcc
-CFLAGS:=-O2
+CFLAGS:=-std=c11 -Wall -Wextra -pedantic
+ifdef DEBUG
+CFLAGS+=-g3 -O0
+else
+CFLAGS+=-O2
+endif
+
 LIBS:=-lgdi32 -lcomctl32
 
 all: demo.exe
