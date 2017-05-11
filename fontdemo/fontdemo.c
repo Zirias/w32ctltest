@@ -4,6 +4,12 @@
 #include <windows.h>
 #include <commctrl.h>
 
+typedef struct PaddedControl
+{
+    WNDPROC baseWndProc;
+    RECT fullClientRect;
+} PaddedControl;
+
 static HINSTANCE instance;
 static HWND mainWindow;
 static HWND buttonSF;
@@ -12,6 +18,7 @@ static HWND buttonMF;
 static HWND textBoxMF;
 static HWND buttonMFC;
 static HWND textBoxMFC;
+static PaddedControl textBoxMFCPadded;
 
 #define WC_mainWindow L"W32CtlTestDemo"
 
@@ -46,51 +53,6 @@ static int enableVisualStyles(void)
     return (int) ulpActivationCookie;
 }
 
-static LRESULT CALLBACK textBoxProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
-{
-    WNDPROC defaultProc = (WNDPROC)(UINT_PTR)GetPropW(w, L"defaultProc");
-    RECT *fullClientRect;
-
-    switch (msg)
-    {
-    case WM_ERASEBKGND:
-        fullClientRect = (RECT *)GetPropW(w, L"fullClientRect");
-        if (!fullClientRect) break;
-        WNDCLASSEXW wc;
-        wc.cbSize = sizeof(wc);
-        GetClassInfoExW(0, L"Edit", &wc);
-        HDC dc = GetDC(w);
-        FillRect(dc, fullClientRect, wc.hbrBackground);
-        ReleaseDC(w, dc);
-        return 1;
-
-    case WM_NCCALCSIZE:
-        if (!wp) break;
-        LRESULT result = CallWindowProc(defaultProc, w, msg, wp, lp);
-        NCCALCSIZE_PARAMS *p = (NCCALCSIZE_PARAMS *)lp;
-        int height = p->rgrc[0].bottom - p->rgrc[0].top;
-        if (height > messageFontMetrics.tmHeight + 3)
-        {
-            fullClientRect = (RECT *)GetPropW(w, L"fullClientRect");
-            if (!fullClientRect)
-            {
-                fullClientRect = malloc(sizeof(RECT));
-                SetPropW(w, L"fullClientRect", (HANDLE)fullClientRect);
-            }
-            memcpy(fullClientRect, &(p->rgrc[0]), sizeof(RECT));
-            MapWindowPoints(GetParent(w), w, (LPPOINT) fullClientRect, 2);
-            int offset = (height - messageFontMetrics.tmHeight - 3) / 2;
-            p->rgrc[0].top += offset;
-            p->rgrc[0].bottom -= offset;
-            fullClientRect->top -= offset;
-            fullClientRect->bottom -= offset;
-        }
-        return result;
-    }
-
-    return CallWindowProc(defaultProc, w, msg, wp, lp);
-}
-
 static void init(void)
 {
     INITCOMMONCONTROLSEX icx;
@@ -117,6 +79,44 @@ static void init(void)
     instance = GetModuleHandleW(0);
 }
 
+static LRESULT CALLBACK paddedControlProc(
+        HWND w, UINT msg, WPARAM wp, LPARAM lp)
+{
+    PaddedControl *self = (PaddedControl *)GetPropW(w, L"paddedControl");
+    WNDCLASSEXW wc;
+
+    switch (msg)
+    {
+    case WM_ERASEBKGND:
+        wc.cbSize = sizeof(wc);
+        GetClassInfoExW(0, L"Edit", &wc);
+        HDC dc = GetDC(w);
+        FillRect(dc, &self->fullClientRect, wc.hbrBackground);
+        ReleaseDC(w, dc);
+        return 1;
+
+    case WM_NCCALCSIZE:
+        if (!wp) break;
+        LRESULT result = CallWindowProc(self->baseWndProc, w, msg, wp, lp);
+        NCCALCSIZE_PARAMS *p = (NCCALCSIZE_PARAMS *)lp;
+        int height = p->rgrc[0].bottom - p->rgrc[0].top;
+        if (height > messageFontMetrics.tmHeight + 3)
+        {
+            memcpy(&self->fullClientRect, &(p->rgrc[0]), sizeof(RECT));
+            MapWindowPoints(GetParent(w), w,
+                    (LPPOINT) &self->fullClientRect, 2);
+            int offset = (height - messageFontMetrics.tmHeight - 3) / 2;
+            p->rgrc[0].top += offset;
+            p->rgrc[0].bottom -= offset;
+            self->fullClientRect.top -= offset;
+            self->fullClientRect.bottom -= offset;
+        }
+        return result;
+    }
+
+    return CallWindowProc(self->baseWndProc, w, msg, wp, lp);
+}
+
 static LRESULT CALLBACK wproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg)
@@ -136,7 +136,7 @@ static LRESULT CALLBACK wproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
         buttonMFC = CreateWindowExW(0, L"Button", L"msgfont adj",
                 WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
                 4, 12 + controlHeightSF + controlHeightMF,
-		buttonWidthMF, controlHeightMF,
+                buttonWidthMF, controlHeightMF,
                 w, 0, instance, 0);
         SendMessageW(buttonMFC, WM_SETFONT, (WPARAM)messageFont, 0);
 
@@ -148,18 +148,19 @@ static LRESULT CALLBACK wproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
         textBoxMF = CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", L"abcdefgh",
                 WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
                 8 + buttonWidthMF, 8 + controlHeightSF,
-		100, controlHeightMF,
+                100, controlHeightMF,
                 w, 0, instance, 0);
         SendMessageW(textBoxMF, WM_SETFONT, (WPARAM)messageFont, 0);
 
         textBoxMFC = CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", L"abcdefgh",
                 WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
                 8 + buttonWidthMF, 12 + controlHeightSF + controlHeightMF,
-		100, controlHeightMF,
+                100, controlHeightMF,
                 w, 0, instance, 0);
-        SetPropW(textBoxMFC, L"defaultProc",
-                (HANDLE)SetWindowLongPtr(textBoxMFC, GWLP_WNDPROC,
-                    (LONG_PTR)textBoxProc));
+        memset(&textBoxMFCPadded, 0, sizeof(PaddedControl));
+        textBoxMFCPadded.baseWndProc = (WNDPROC)SetWindowLongPtr(
+                textBoxMFC, GWLP_WNDPROC, (LONG_PTR)paddedControlProc);
+        SetPropW(textBoxMFC, L"paddedControl", &textBoxMFCPadded);
         SetWindowPos(textBoxMFC, 0, 0, 0, 0, 0,
                 SWP_NOOWNERZORDER|SWP_NOSIZE|SWP_NOMOVE|SWP_FRAMECHANGED);
         SendMessageW(textBoxMFC, WM_SETFONT, (WPARAM)messageFont, 0);
